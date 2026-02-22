@@ -1,6 +1,64 @@
-{\rtf1\ansi\ansicpg1252\cocoartf2868
-\cocoatextscaling0\cocoaplatform0{\fonttbl}
-{\colortbl;\red255\green255\blue255;}
-{\*\expandedcolortbl;;}
-\paperw11900\paperh16840\margl1440\margr1440\vieww11520\viewh8400\viewkind0
-}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Cinema Player</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background: #000; color: #fff; font-family: sans-serif; }
+    .glass { background: rgba(255,255,255,0.05); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
+  </style>
+</head>
+<body class="p-4 md:p-10">
+  <nav class="max-w-6xl mx-auto flex items-center justify-between mb-10">
+    <a href="index.html" class="px-6 py-2 glass rounded-xl text-xs font-bold text-pink-500">← Back</a>
+  </nav>
+
+  <main class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-4 gap-6">
+    <div class="lg:col-span-3 space-y-6">
+      <div class="rounded-3xl overflow-hidden bg-black aspect-video glass">
+        <iframe id="player" class="w-full h-full" allowfullscreen></iframe>
+      </div>
+      <div class="glass p-6 rounded-3xl flex flex-col md:flex-row justify-between items-center gap-4">
+        <div>
+          <h1 id="title" class="text-xl font-bold">Loading...</h1>
+          <p id="meta" class="text-xs text-white/40 mt-1"></p>
+        </div>
+        <button id="btnSave" class="bg-pink-600 px-8 py-3 rounded-xl text-xs font-bold uppercase">Save to Library</button>
+      </div>
+    </div>
+    <div id="related" class="space-y-4"></div>
+  </main>
+
+  <script>
+    const id = new URLSearchParams(location.search).get("id");
+    const WORKER = "https://patient-mountain-7102.moananayoob.workers.dev";
+    const api = url => `${WORKER}?url=${encodeURIComponent(url)}`;
+    let videoData = null;
+
+    async function load() {
+      const res = await fetch(api(`https://www.eporner.com/api/v2/video/id/?id=${id}&format=json`));
+      videoData = await res.json();
+      document.getElementById('title').textContent = videoData.title;
+      document.getElementById('meta').textContent = `${videoData.length_min} min • ${videoData.views} views`;
+      document.getElementById('player').src = videoData.embed;
+    }
+
+    document.getElementById('btnSave').onclick = async () => {
+      if(!videoData) return;
+      const db = await new Promise(res => {
+        const req = indexedDB.open("VideoVault", 1);
+        req.onupgradeneeded = e => e.target.result.createObjectStore("downloads", {keyPath: "id"});
+        req.onsuccess = e => res(e.target.result);
+      });
+      const tx = db.transaction("downloads", "readwrite");
+      tx.objectStore("downloads").put({
+        id: id, title: videoData.title, thumb: api(videoData.default_thumb.src), createdAt: Date.now()
+      });
+      alert("Added to Library");
+    };
+
+    load();
+  </script>
+</body>
+</html>
