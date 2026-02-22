@@ -1,14 +1,57 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-  <meta http-equiv="Content-Style-Type" content="text/css">
-  <title></title>
-  <meta name="Generator" content="Cocoa HTML Writer">
-  <meta name="CocoaVersion" content="2685.4">
-  <style type="text/css">
+  <meta charset="UTF-8">
+  <title>Your Library</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background: #000; color: #fff; font-family: sans-serif; }
+    .glass { background: rgba(255,255,255,0.05); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
   </style>
 </head>
-<body>
+<body class="p-6 md:p-12">
+  <header class="max-w-6xl mx-auto flex justify-between items-center mb-10">
+    <h1 class="text-2xl font-bold">Your Library</h1>
+    <a href="index.html" class="px-5 py-2 glass rounded-xl text-xs font-bold text-pink-500">Back Home</a>
+  </header>
+  <main id="grid" class="max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-6"></main>
+
+  <script>
+    async function init() {
+      const db = await new Promise(res => {
+        const req = indexedDB.open("VideoVault", 1);
+        req.onsuccess = e => res(e.target.result);
+      });
+      const tx = db.transaction("downloads", "readonly");
+      const list = await new Promise(r => tx.objectStore("downloads").getAll().onsuccess = e => r(e.target.result));
+      const grid = document.getElementById("grid");
+
+      list.forEach(v => {
+        const d = document.createElement("div");
+        d.className = "glass rounded-2xl overflow-hidden";
+        d.innerHTML = `
+          <img src="${v.thumb}" class="w-full aspect-video object-cover">
+          <div class="p-4">
+            <h3 class="text-xs font-bold line-clamp-2 h-8">${v.title}</h3>
+            <div class="mt-3 flex gap-2">
+              <button onclick="location.href='video.html?id=${v.id}'" class="flex-1 py-2 bg-white text-black text-[10px] font-bold rounded-lg uppercase">Play</button>
+              <button onclick="del('${v.id}')" class="px-3 py-2 bg-red-500/20 text-red-500 rounded-lg text-[10px]">✕</button>
+            </div>
+          </div>`;
+        grid.appendChild(d);
+      });
+    }
+
+    async function del(id) {
+      const db = await new Promise(res => {
+        const req = indexedDB.open("VideoVault", 1);
+        req.onsuccess = e => res(e.target.result);
+      });
+      db.transaction("downloads", "readwrite").objectStore("downloads").delete(id);
+      location.reload();
+    }
+
+    init();
+  </script>
 </body>
 </html>
