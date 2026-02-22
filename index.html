@@ -1,14 +1,109 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-  <meta http-equiv="Content-Style-Type" content="text/css">
-  <title></title>
-  <meta name="Generator" content="Cocoa HTML Writer">
-  <meta name="CocoaVersion" content="2685.4">
-  <style type="text/css">
+  <meta charset="UTF-8">
+  <title>Video Discovery</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background: #000; color: #fff; font-family: sans-serif; }
+    .glass { background: rgba(255,255,255,0.05); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
+    .pill { background: rgba(255,255,255,0.1); padding: 8px 16px; border-radius: 20px; font-size: 11px; cursor: pointer; white-space: nowrap; transition: 0.2s; }
+    .pill.active { background: #ec4899; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
   </style>
 </head>
 <body>
+
+<header class="sticky top-0 z-50 bg-black/90 p-4 border-b border-white/10">
+  <div class="max-w-7xl mx-auto space-y-4">
+    <div class="flex justify-between items-center">
+      <h1 class="text-lg font-bold">Video Browser</h1>
+      <a href="downloads.html" class="text-[10px] font-bold text-pink-500 uppercase">Library</a>
+    </div>
+    <div class="flex gap-2">
+      <input id="q" type="text" placeholder="Search across all sources..." class="flex-1 bg-white/5 border border-white/10 p-3 rounded-xl text-sm outline-none focus:border-pink-500">
+      <select id="actorSelect" class="bg-white/5 border border-white/10 rounded-xl px-3 text-[10px] outline-none">
+        <option value="">All Actors</option>
+        <option value="Mia">Mia</option><option value="Lana">Lana</option><option value="Riley">Riley</option>
+      </select>
+      <button onclick="doSearch()" class="bg-pink-600 px-6 rounded-xl text-[10px] font-bold uppercase">Search</button>
+    </div>
+    <div id="catRow" class="flex gap-2 overflow-x-auto no-scrollbar pb-1"></div>
+  </div>
+</header>
+
+<main class="p-4 max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-4" id="grid"></main>
+
+<script>
+const WORKER = "https://patient-mountain-7102.moananayoob.workers.dev"; 
+const api = (url) => `${WORKER}?url=${encodeURIComponent(url)}`;
+let state = { keyword: "trending", items: [] };
+
+async function doSearch() {
+  const query = document.getElementById('q').value || state.keyword;
+  const grid = document.getElementById('grid');
+  grid.innerHTML = "<div class='col-span-full text-center py-20 opacity-30'>Syncing Sources...</div>";
+
+  try {
+    const epRes = await fetch(api(`https://www.eporner.com/api/v2/video/search/?query=${query}&per_page=30&format=json`));
+    const epData = await epRes.json();
+    state.items = (epData.videos || []).map(v => ({ id: v.id, title: v.title, thumb: v.default_thumb.src, src: "EP", tags: v.keywords || "" }));
+
+    const feeds = [
+      {k:"ML", u: `https://motherless.com/rss/videos/${query}`},
+      {k:"HQ", u: `https://www.hqporner.com/rss/search/${query}/`},
+      {k:"Trex", u: `https://www.porntrex.com/rss/search/${query}/`}
+    ];
+
+    feeds.forEach(async s => {
+      try {
+        const res = await fetch(api(s.u));
+        const txt = await res.text();
+        const doc = new DOMParser().parseFromString(txt, "text/xml");
+        const rssItems = [...doc.querySelectorAll("item")].map(it => ({
+          id: "", url: it.querySelector("link")?.textContent, title: it.querySelector("title")?.textContent,
+          thumb: it.getElementsByTagName("media:thumbnail")[0]?.getAttribute("url") || it.querySelector("enclosure")?.getAttribute("url"),
+          src: s.k, tags: ""
+        }));
+        state.items = [...state.items, ...rssItems.filter(i => i.thumb)];
+        render(state.items);
+      } catch(e){}
+    });
+    render(state.items);
+  } catch(e){}
+}
+
+function render(items) {
+  const grid = document.getElementById('grid');
+  grid.innerHTML = "";
+  items.forEach(v => {
+    const card = document.createElement('div');
+    card.className = "glass rounded-2xl overflow-hidden cursor-pointer hover:border-pink-500/50 transition-all";
+    card.innerHTML = `
+      <div class="aspect-video relative bg-neutral-900">
+        <img src="${api(v.thumb)}" class="w-full h-full object-cover">
+        <div class="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-black/60 text-[8px] font-bold uppercase">${v.src}</div>
+      </div>
+      <div class="p-3 text-[11px] font-bold line-clamp-2 h-10">${v.title}</div>`;
+    card.onclick = () => v.id ? location.href = `video.html?id=${v.id}` : window.open(v.url, '_blank');
+    grid.appendChild(card);
+  });
+}
+
+document.getElementById('actorSelect').onchange = (e) => {
+  const val = e.target.value.toLowerCase();
+  render(state.items.filter(i => i.title.toLowerCase().includes(val) || i.tags.toLowerCase().includes(val)));
+};
+
+const cats = ["Trending", "Asian", "Amateur", "Teen", "Milf", "POV"];
+cats.forEach(c => {
+  const b = document.createElement('div');
+  b.className = "pill"; b.innerText = c;
+  b.onclick = () => { state.keyword = c.toLowerCase(); doSearch(); };
+  document.getElementById('catRow').appendChild(b);
+});
+
+doSearch();
+</script>
 </body>
 </html>
