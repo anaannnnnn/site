@@ -2,86 +2,239 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Cinema Player</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Watch — VideoVault</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    body { background: #000; color: #fff; font-family: sans-serif; }
-    .glass { background: rgba(255,255,255,0.05); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
+    :root {
+      --color-bg: #000000;
+      --color-card: #0c0c0d;
+      --color-muted: #181818;
+      --color-border: rgba(255,255,255,0.08);
+      --color-accent: #e11d48;
+      --color-accent-hover: #be123c;
+      --color-text: #f8fafc;
+      --color-text-muted: #94a3b8;
+    }
+    * { box-sizing: border-box; }
+    body { background: var(--color-bg); color: var(--color-text); font-family: 'Inter', sans-serif; }
+    .card {
+      background: var(--color-card);
+      border: 1px solid var(--color-border);
+    }
+    .related-card {
+      background: var(--color-card);
+      border: 1px solid var(--color-border);
+      cursor: pointer;
+      transition: border-color 200ms, box-shadow 200ms;
+    }
+    .related-card:hover {
+      border-color: var(--color-accent);
+      box-shadow: 0 4px 16px rgba(225,29,72,0.12);
+    }
+    .skeleton {
+      background: linear-gradient(90deg, #181818 25%, #242424 50%, #181818 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+    }
+    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+    .btn-save {
+      background: var(--color-accent);
+      transition: background 150ms, transform 100ms;
+    }
+    .btn-save:hover { background: var(--color-accent-hover); }
+    .btn-save:active { transform: scale(0.97); }
+    .btn-back {
+      background: rgba(255,255,255,0.07);
+      border: 1px solid var(--color-border);
+      transition: background 150ms;
+    }
+    .btn-back:hover { background: rgba(255,255,255,0.12); }
+    #player { background: #000; }
   </style>
 </head>
-<body class="p-4 md:p-10">
-  <nav class="max-w-6xl mx-auto flex items-center justify-between mb-10">
-    <a href="index.html" class="px-6 py-2 glass rounded-xl text-xs font-bold text-pink-500">← Back</a>
-  </nav>
+<body>
 
-  <main class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-4 gap-6">
-    <div class="lg:col-span-3 space-y-6">
-      <div class="rounded-3xl overflow-hidden bg-black aspect-video glass">
-        <iframe id="player" class="w-full h-full" allowfullscreen></iframe>
+<nav class="sticky top-0 z-50 border-b px-4 py-3" style="background: rgba(0,0,0,0.92); backdrop-filter: blur(16px); border-color: var(--color-border);">
+  <div class="max-w-6xl mx-auto flex items-center justify-between">
+    <a href="index.html" class="btn-back flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold text-white">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+      Back
+    </a>
+    <div class="flex items-center gap-2">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" class="text-rose-500" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      <span class="text-sm font-bold">VideoVault</span>
+    </div>
+    <a href="downloads.html" class="btn-back flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold" style="color: var(--color-accent);">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg>
+      Library
+    </a>
+  </div>
+</nav>
+
+<main class="max-w-6xl mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-4 gap-6">
+  <!-- Player column -->
+  <div class="lg:col-span-3 space-y-4">
+    <!-- Player -->
+    <div class="card rounded-2xl overflow-hidden aspect-video">
+      <iframe id="player" class="w-full h-full" allowfullscreen allow="autoplay; fullscreen"></iframe>
+    </div>
+
+    <!-- Title + meta -->
+    <div class="card p-5 rounded-2xl">
+      <div id="titleSkeleton" class="space-y-2">
+        <div class="skeleton h-5 w-3/4 rounded"></div>
+        <div class="skeleton h-3 w-1/3 rounded"></div>
       </div>
-      <div class="glass p-6 rounded-3xl flex flex-col md:flex-row justify-between items-center gap-4">
-        <div>
-          <h1 id="title" class="text-xl font-bold">Loading...</h1>
-          <p id="meta" class="text-xs text-white/40 mt-1"></p>
-        </div>
-        <button id="btnSave" class="bg-pink-600 px-8 py-3 rounded-xl text-xs font-bold uppercase">Save to Library</button>
+      <div id="titleBlock" class="hidden">
+        <h1 id="title" class="text-lg font-bold leading-snug"></h1>
+        <p id="meta" class="text-xs mt-1.5" style="color: var(--color-text-muted);"></p>
       </div>
     </div>
-    <div id="related" class="space-y-4"></div>
-  </main>
 
-  <script>
-    const id = new URLSearchParams(location.search).get("id");
-    const PROXIES = [
-      (url) => `https://universal.moananayoob.workers.dev?url=${encodeURIComponent(url)}`,
-      (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
-    ];
-    let activeProxy = 0;
-    async function fetchWithProxy(url) {
-      let lastError = new Error("Request failed");
-      for (let i = 0; i < PROXIES.length; i++) {
-        try {
-          const res = await fetch(PROXIES[i](url));
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          activeProxy = i;
-          return res;
-        } catch (e) {
-          lastError = e;
-        }
-      }
-      throw lastError;
+    <!-- Actions -->
+    <div class="flex gap-3">
+      <button id="btnSave" class="btn-save flex items-center gap-2 px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wide text-white" disabled>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        Save to Library
+      </button>
+      <div id="savedBadge" class="hidden items-center gap-1.5 px-4 py-3 rounded-xl text-xs font-semibold text-emerald-400" style="background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.2);">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+        Saved
+      </div>
+    </div>
+  </div>
+
+  <!-- Related panel -->
+  <aside>
+    <h2 class="text-xs font-bold uppercase tracking-widest mb-4" style="color: var(--color-text-muted);">Related</h2>
+    <div id="related" class="space-y-3">
+      <!-- Skeletons -->
+      ${Array(4).fill(0).map(() => `
+      <div class="card rounded-xl overflow-hidden flex gap-3 p-2">
+        <div class="skeleton rounded-lg flex-shrink-0" style="width:80px;height:52px;"></div>
+        <div class="flex-1 space-y-1.5 py-1">
+          <div class="skeleton h-2.5 w-full rounded"></div>
+          <div class="skeleton h-2.5 w-2/3 rounded"></div>
+        </div>
+      </div>`).join('')}
+    </div>
+  </aside>
+</main>
+
+<script>
+const id = new URLSearchParams(location.search).get("id");
+
+const PROXIES = [
+  (url) => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
+  (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  (url) => `https://universal.moananayoob.workers.dev?url=${encodeURIComponent(url)}`
+];
+
+async function fetchWithProxy(url) {
+  let lastError = new Error("All proxies failed");
+  for (let i = 0; i < PROXIES.length; i++) {
+    try {
+      const res = await fetch(PROXIES[i](url), { signal: AbortSignal.timeout(8000) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res;
+    } catch (e) {
+      lastError = e;
     }
-    let videoData = null;
+  }
+  throw lastError;
+}
 
-    async function load() {
-      try {
-        const res = await fetchWithProxy(`https://www.eporner.com/api/v2/video/id/?id=${id}&format=json`);
-        videoData = await res.json();
-        document.getElementById('title').textContent = videoData.title;
-        document.getElementById('meta').textContent = `${videoData.length_min} min • ${videoData.views} views`;
-        document.getElementById('player').src = videoData.embed;
-      } catch (e) {
-        document.getElementById('title').textContent = "Failed to load video";
-        document.getElementById('meta').textContent = "API request failed. Please go back and retry.";
-        document.getElementById('btnSave').disabled = true;
-      }
-    }
+let videoData = null;
 
-    document.getElementById('btnSave').onclick = async () => {
-      if(!videoData) return;
-      const db = await new Promise(res => {
-        const req = indexedDB.open("VideoVault", 1);
-        req.onupgradeneeded = e => e.target.result.createObjectStore("downloads", {keyPath: "id"});
-        req.onsuccess = e => res(e.target.result);
-      });
-      const tx = db.transaction("downloads", "readwrite");
-      tx.objectStore("downloads").put({
-        id: id, title: videoData.title, thumb: videoData.default_thumb.src, createdAt: Date.now()
-      });
-      alert("Added to Library");
-    };
+function escapeHtml(str) {
+  if (!str) return '';
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 
-    load();
-  </script>
+async function load() {
+  if (!id) {
+    document.getElementById('title').textContent = "No video ID provided";
+    document.getElementById('titleSkeleton').classList.add('hidden');
+    document.getElementById('titleBlock').classList.remove('hidden');
+    return;
+  }
+
+  try {
+    const res = await fetchWithProxy(`https://www.eporner.com/api/v2/video/id/?id=${id}&format=json&thumbsize=big`);
+    videoData = await res.json();
+
+    document.getElementById('player').src = videoData.embed;
+    document.getElementById('title').textContent = videoData.title;
+    document.getElementById('meta').textContent = [
+      videoData.length_min ? `${videoData.length_min} min` : '',
+      videoData.views ? `${Number(videoData.views).toLocaleString()} views` : '',
+      videoData.added ? new Date(videoData.added * 1000).toLocaleDateString() : ''
+    ].filter(Boolean).join(' · ');
+
+    document.getElementById('titleSkeleton').classList.add('hidden');
+    document.getElementById('titleBlock').classList.remove('hidden');
+    document.getElementById('btnSave').disabled = false;
+
+    loadRelated(videoData.keywords);
+  } catch (e) {
+    document.getElementById('titleSkeleton').classList.add('hidden');
+    document.getElementById('titleBlock').classList.remove('hidden');
+    document.getElementById('title').textContent = "Failed to load video";
+    document.getElementById('meta').textContent = "API request failed. Please go back and retry.";
+    document.getElementById('related').innerHTML = '';
+  }
+}
+
+async function loadRelated(keywords) {
+  const query = (keywords || "trending").split(",")[0].trim();
+  try {
+    const res = await fetchWithProxy(`https://www.eporner.com/api/v2/video/search/?query=${encodeURIComponent(query)}&per_page=8&format=json`);
+    const data = await res.json();
+    const videos = (data.videos || []).filter(v => v.id !== id).slice(0, 6);
+    document.getElementById('related').innerHTML = videos.map(v => `
+      <div class="related-card rounded-xl overflow-hidden flex gap-3 p-2 cursor-pointer" onclick="location.href='video.html?id=${v.id}'">
+        <div class="flex-shrink-0 rounded-lg overflow-hidden" style="width:88px;height:56px;background:var(--color-muted);">
+          <img src="${v.default_thumb?.src || v.default_thumb}" alt="" class="w-full h-full object-cover" loading="lazy">
+        </div>
+        <div class="flex-1 min-w-0 py-0.5">
+          <p class="text-[10px] font-semibold leading-snug line-clamp-3" style="color:var(--color-text);">${escapeHtml(v.title)}</p>
+          ${v.length_min ? `<p class="text-[9px] mt-1" style="color:var(--color-text-muted);">${v.length_min} min</p>` : ''}
+        </div>
+      </div>`).join('');
+  } catch(e) {
+    document.getElementById('related').innerHTML = '';
+  }
+}
+
+document.getElementById('btnSave').onclick = async () => {
+  if (!videoData) return;
+  try {
+    const db = await new Promise((res, rej) => {
+      const req = indexedDB.open("VideoVault", 1);
+      req.onupgradeneeded = e => e.target.result.createObjectStore("downloads", { keyPath: "id" });
+      req.onsuccess = e => res(e.target.result);
+      req.onerror = rej;
+    });
+    const tx = db.transaction("downloads", "readwrite");
+    tx.objectStore("downloads").put({
+      id,
+      title: videoData.title,
+      thumb: videoData.default_thumb?.src || videoData.default_thumb,
+      duration: videoData.length_min,
+      createdAt: Date.now()
+    });
+    document.getElementById('btnSave').classList.add('hidden');
+    document.getElementById('savedBadge').classList.remove('hidden');
+    document.getElementById('savedBadge').classList.add('flex');
+  } catch(e) {
+    alert("Failed to save. Please try again.");
+  }
+};
+
+load();
+</script>
 </body>
 </html>
