@@ -127,7 +127,9 @@
 <script>
 const id = new URLSearchParams(location.search).get("id");
 
+// Replace YOUR_WORKER_URL with your deployed Cloudflare Worker URL (worker.js)
 const PROXIES = [
+  (url) => `https://videoproxy.moananayoob.workers.dev?url=${encodeURIComponent(url)}`,
   (url) => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
   (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
   (url) => `https://universal.moananayoob.workers.dev?url=${encodeURIComponent(url)}`
