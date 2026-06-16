@@ -6,7 +6,7 @@
   <title>Watch — VideoVault</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght=300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
       --color-bg: #000000;
@@ -52,7 +52,7 @@
       transition: background 150ms;
     }
     .btn-back:hover { background: rgba(255,255,255,0.12); }
-    #player { background: #000; }
+    #player { background: #000; width: 100%; height: 100%; }
   </style>
 </head>
 <body>
@@ -75,14 +75,11 @@
 </nav>
 
 <main class="max-w-6xl mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-4 gap-6">
-  <!-- Player column -->
   <div class="lg:col-span-3 space-y-4">
-    <!-- Player -->
-    <div class="card rounded-2xl overflow-hidden aspect-video">
-      <iframe id="player" class="w-full h-full" allowfullscreen allow="autoplay; fullscreen"></iframe>
+    <div class="card rounded-2xl overflow-hidden aspect-video relative">
+      <video id="player" controls crossorigin="anonymous" autoplay></video>
     </div>
 
-    <!-- Title + meta -->
     <div class="card p-5 rounded-2xl">
       <div id="titleSkeleton" class="space-y-2">
         <div class="skeleton h-5 w-3/4 rounded"></div>
@@ -94,7 +91,6 @@
       </div>
     </div>
 
-    <!-- Actions -->
     <div class="flex gap-3">
       <button id="btnSave" class="btn-save flex items-center gap-2 px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wide text-white" disabled>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
@@ -107,31 +103,20 @@
     </div>
   </div>
 
-  <!-- Related panel -->
   <aside>
     <h2 class="text-xs font-bold uppercase tracking-widest mb-4" style="color: var(--color-text-muted);">Related</h2>
     <div id="related" class="space-y-3">
-      <!-- Skeletons -->
-      ${Array(4).fill(0).map(() => `
-      <div class="card rounded-xl overflow-hidden flex gap-3 p-2">
-        <div class="skeleton rounded-lg flex-shrink-0" style="width:80px;height:52px;"></div>
-        <div class="flex-1 space-y-1.5 py-1">
-          <div class="skeleton h-2.5 w-full rounded"></div>
-          <div class="skeleton h-2.5 w-2/3 rounded"></div>
-        </div>
-      </div>`).join('')}
-    </div>
+      </div>
   </aside>
 </main>
 
 <script>
-const id = new URLSearchParams(location.search).get("id");
+const urlParams = new URLSearchParams(location.search);
+const id = urlParams.get("id");
+const directUrl = urlParams.get("url");
 
-// Replace YOUR_WORKER_URL with your deployed Cloudflare Worker URL (worker.js)
 const PROXIES = [
   (url) => `https://videoproxy.moananayoob.workers.dev?url=${encodeURIComponent(url)}`,
-  (url) => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
-  (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
   (url) => `https://universal.moananayoob.workers.dev?url=${encodeURIComponent(url)}`
 ];
 
@@ -156,19 +141,56 @@ function escapeHtml(str) {
   return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+function renderSkeletons() {
+  document.getElementById('related').innerHTML = Array(4).fill(0).map(() => `
+    <div class="card rounded-xl overflow-hidden flex gap-3 p-2">
+      <div class="skeleton rounded-lg flex-shrink-0" style="width:80px;height:52px;"></div>
+      <div class="flex-1 space-y-1.5 py-1">
+        <div class="skeleton h-2.5 w-full rounded"></div>
+        <div class="skeleton h-2.5 w-2/3 rounded"></div>
+      </div>
+    </div>`).join('');
+}
+
 async function load() {
-  if (!id) {
-    document.getElementById('title').textContent = "No video ID provided";
+  renderSkeletons();
+
+  if (!id && !directUrl) {
+    document.getElementById('title').textContent = "No context or URL parsed";
     document.getElementById('titleSkeleton').classList.add('hidden');
     document.getElementById('titleBlock').classList.remove('hidden');
     return;
   }
 
+  // Handle explicit URL streaming targets (RSS layouts)
+  if (directUrl) {
+    videoData = {
+      id: "rss-" + btoa(directUrl).substring(0, 10),
+      title: "External Video Stream",
+      embed: directUrl,
+      default_thumb: "",
+      length_min: ""
+    };
+    
+    document.getElementById('player').src = PROXIES[0](directUrl);
+    document.getElementById('title').textContent = videoData.title;
+    document.getElementById('meta').textContent = "Direct Stream Link";
+    document.getElementById('titleSkeleton').classList.add('hidden');
+    document.getElementById('titleBlock').classList.remove('hidden');
+    document.getElementById('btnSave').disabled = false;
+    loadRelated("trending");
+    return;
+  }
+
+  // Handle standard JSON payload processing
   try {
     const res = await fetchWithProxy(`https://www.eporner.com/api/v2/video/id/?id=${id}&format=json&thumbsize=big`);
     videoData = await res.json();
 
-    document.getElementById('player').src = videoData.embed;
+    // Route direct asset formats into the proxy architecture safely
+    const rawAssetUrl = videoData.embed || videoData.url;
+    document.getElementById('player').src = PROXIES[0](rawAssetUrl);
+    
     document.getElementById('title').textContent = videoData.title;
     document.getElementById('meta').textContent = [
       videoData.length_min ? `${videoData.length_min} min` : '',
@@ -185,7 +207,7 @@ async function load() {
     document.getElementById('titleSkeleton').classList.add('hidden');
     document.getElementById('titleBlock').classList.remove('hidden');
     document.getElementById('title').textContent = "Failed to load video";
-    document.getElementById('meta').textContent = "API request failed. Please go back and retry.";
+    document.getElementById('meta').textContent = "API query failed. Check worker logs.";
     document.getElementById('related').innerHTML = '';
   }
 }
@@ -197,7 +219,7 @@ async function loadRelated(keywords) {
     const data = await res.json();
     const videos = (data.videos || []).filter(v => v.id !== id).slice(0, 6);
     document.getElementById('related').innerHTML = videos.map(v => `
-      <div class="related-card rounded-xl overflow-hidden flex gap-3 p-2 cursor-pointer" onclick="location.href='video.html?id=${v.id}'">
+      <div class="related-card rounded-xl overflow-hidden flex gap-3 p-2" onclick="location.href='video.html?id=${v.id}'">
         <div class="flex-shrink-0 rounded-lg overflow-hidden" style="width:88px;height:56px;background:var(--color-muted);">
           <img src="${v.default_thumb?.src || v.default_thumb}" alt="" class="w-full h-full object-cover" loading="lazy">
         </div>
@@ -222,17 +244,17 @@ document.getElementById('btnSave').onclick = async () => {
     });
     const tx = db.transaction("downloads", "readwrite");
     tx.objectStore("downloads").put({
-      id,
+      id: id || videoData.id,
       title: videoData.title,
-      thumb: videoData.default_thumb?.src || videoData.default_thumb,
-      duration: videoData.length_min,
+      thumb: videoData.default_thumb?.src || videoData.default_thumb || "",
+      duration: videoData.length_min || "",
       createdAt: Date.now()
     });
     document.getElementById('btnSave').classList.add('hidden');
     document.getElementById('savedBadge').classList.remove('hidden');
     document.getElementById('savedBadge').classList.add('flex');
   } catch(e) {
-    alert("Failed to save. Please try again.");
+    alert("Failed to save asset registry context locally.");
   }
 };
 
