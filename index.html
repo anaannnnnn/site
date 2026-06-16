@@ -1,3 +1,9 @@
+Here is your complete index.html file updated to fix the video playback and proxy handling issues.
+### What was fixed:
+ 1. **Fallback Proxy Hierarchy Removed**: Hardcoded third-party CORS arrays like corsproxy.io and allorigins break on video stream formats because they block or chunk requests incorrectly. Your updated code uses your dedicated, custom Cloudflare video worker as the absolute fallback.
+ 2. **Added Missing Navigation Support**: The card links now parse seamlessly over to your video viewing wrapper layout.
+### Complete index.html File
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,7 +12,7 @@
   <title>VideoVault</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght=300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
       --color-bg: #000000;
@@ -82,10 +88,8 @@
 </head>
 <body>
 
-<!-- Header -->
 <header class="sticky top-0 z-50 border-b" style="background: rgba(0,0,0,0.92); backdrop-filter: blur(16px); border-color: var(--color-border);">
   <div class="max-w-7xl mx-auto px-4 py-3 space-y-3">
-    <!-- Top row -->
     <div class="flex justify-between items-center">
       <div class="flex items-center gap-2">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" class="text-rose-500" stroke="currentColor" stroke-width="2">
@@ -98,7 +102,6 @@
         Library
       </a>
     </div>
-    <!-- Search row -->
     <div class="flex gap-2">
       <div class="relative flex-1">
         <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style="color: var(--color-text-muted);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -112,28 +115,22 @@
       </select>
       <button onclick="doSearch()" class="btn-primary px-5 rounded-xl text-[11px] font-bold uppercase tracking-wide text-white">Search</button>
     </div>
-    <!-- Category pills -->
     <div id="catRow" class="flex gap-2 overflow-x-auto no-scrollbar pb-0.5"></div>
   </div>
 </header>
 
-<!-- Status bar -->
 <div id="statusBar" class="hidden max-w-7xl mx-auto px-4 py-2 text-[11px]" style="color: var(--color-text-muted);"></div>
 
-<!-- Grid -->
 <main class="max-w-7xl mx-auto px-4 py-5 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3" id="grid"></main>
 
-<!-- Footer -->
 <footer class="max-w-7xl mx-auto px-4 py-8 mt-4 text-center text-[11px]" style="color: var(--color-text-muted); border-top: 1px solid var(--color-border);">
   VideoVault &mdash; Discover &amp; Stream
 </footer>
 
 <script>
-// Replace YOUR_WORKER_URL with your deployed Cloudflare Worker URL (worker.js)
+// Specialized proxies that support media streaming and Range headers
 const PROXIES = [
   (url) => `https://videoproxy.moananayoob.workers.dev?url=${encodeURIComponent(url)}`,
-  (url) => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
-  (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
   (url) => `https://universal.moananayoob.workers.dev?url=${encodeURIComponent(url)}`
 ];
 
@@ -183,6 +180,7 @@ async function doSearch() {
     const epData = await epRes.json();
     state.items = (epData.videos || []).map(v => ({
       id: v.id,
+      url: v.url || '',
       title: v.title,
       thumb: v.default_thumb?.src || v.default_thumb,
       duration: v.length_min ? `${v.length_min}m` : '',
@@ -251,7 +249,14 @@ function render(items) {
       <div class="p-3">
         <p class="text-[11px] font-semibold leading-tight line-clamp-2" style="min-height: 2.5em;">${escapeHtml(v.title)}</p>
       </div>`;
-    card.onclick = () => v.id ? location.href = `video.html?id=${v.id}` : window.open(v.url, '_blank');
+    
+    card.onclick = () => {
+      if (v.id) {
+        location.href = `video.html?id=${v.id}`;
+      } else if (v.url) {
+        location.href = `video.html?url=${encodeURIComponent(v.url)}`;
+      }
+    };
     grid.appendChild(card);
   });
 }
@@ -289,3 +294,5 @@ doSearch();
 </script>
 </body>
 </html>
+
+```
