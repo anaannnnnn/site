@@ -35,8 +35,26 @@
 <main class="p-4 max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-4" id="grid"></main>
 
 <script>
-const WORKER = "https://universal.moananayoob.workers.dev"; 
-const api = (url) => `${WORKER}?url=${encodeURIComponent(url)}`;
+const PROXIES = [
+  (url) => `https://universal.moananayoob.workers.dev?url=${encodeURIComponent(url)}`,
+  (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
+];
+let activeProxy = 0;
+const proxiedUrl = (url) => PROXIES[activeProxy](url);
+async function fetchWithProxy(url) {
+  let lastError = new Error("Request failed");
+  for (let i = 0; i < PROXIES.length; i++) {
+    try {
+      const res = await fetch(PROXIES[i](url));
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      activeProxy = i;
+      return res;
+    } catch (e) {
+      lastError = e;
+    }
+  }
+  throw lastError;
+}
 let state = { keyword: "trending", items: [] };
 
 async function doSearch() {
@@ -45,7 +63,7 @@ async function doSearch() {
   grid.innerHTML = "<div class='col-span-full text-center py-20 opacity-30'>Syncing Sources...</div>";
 
   try {
-    const epRes = await fetch(api(`https://www.eporner.com/api/v2/video/search/?query=${query}&per_page=30&format=json`));
+    const epRes = await fetchWithProxy(`https://www.eporner.com/api/v2/video/search/?query=${query}&per_page=30&format=json`);
     const epData = await epRes.json();
     state.items = (epData.videos || []).map(v => ({ id: v.id, title: v.title, thumb: v.default_thumb.src, src: "EP", tags: v.keywords || "" }));
 
@@ -57,7 +75,7 @@ async function doSearch() {
 
     feeds.forEach(async s => {
       try {
-        const res = await fetch(api(s.u));
+        const res = await fetchWithProxy(s.u);
         const txt = await res.text();
         const doc = new DOMParser().parseFromString(txt, "text/xml");
         const rssItems = [...doc.querySelectorAll("item")].map(it => ({
@@ -70,7 +88,9 @@ async function doSearch() {
       } catch(e){}
     });
     render(state.items);
-  } catch(e){}
+  } catch(e){
+    grid.innerHTML = "<div class='col-span-full text-center py-20 text-red-400'>API failed to load. Please retry.</div>";
+  }
 }
 
 function render(items) {
@@ -81,7 +101,7 @@ function render(items) {
     card.className = "glass rounded-2xl overflow-hidden cursor-pointer hover:border-pink-500/50 transition-all";
     card.innerHTML = `
       <div class="aspect-video relative bg-neutral-900">
-        <img src="${api(v.thumb)}" class="w-full h-full object-cover">
+        <img src="${v.thumb}" class="w-full h-full object-cover">
         <div class="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-black/60 text-[8px] font-bold uppercase">${v.src}</div>
       </div>
       <div class="p-3 text-[11px] font-bold line-clamp-2 h-10">${v.title}</div>`;

@@ -32,16 +32,39 @@
 
   <script>
     const id = new URLSearchParams(location.search).get("id");
-    const WORKER = "https://universal.moananayoob.workers.dev";
-    const api = url => `${WORKER}?url=${encodeURIComponent(url)}`;
+    const PROXIES = [
+      (url) => `https://universal.moananayoob.workers.dev?url=${encodeURIComponent(url)}`,
+      (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
+    ];
+    let activeProxy = 0;
+    async function fetchWithProxy(url) {
+      let lastError = new Error("Request failed");
+      for (let i = 0; i < PROXIES.length; i++) {
+        try {
+          const res = await fetch(PROXIES[i](url));
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          activeProxy = i;
+          return res;
+        } catch (e) {
+          lastError = e;
+        }
+      }
+      throw lastError;
+    }
     let videoData = null;
 
     async function load() {
-      const res = await fetch(api(`https://www.eporner.com/api/v2/video/id/?id=${id}&format=json`));
-      videoData = await res.json();
-      document.getElementById('title').textContent = videoData.title;
-      document.getElementById('meta').textContent = `${videoData.length_min} min • ${videoData.views} views`;
-      document.getElementById('player').src = videoData.embed;
+      try {
+        const res = await fetchWithProxy(`https://www.eporner.com/api/v2/video/id/?id=${id}&format=json`);
+        videoData = await res.json();
+        document.getElementById('title').textContent = videoData.title;
+        document.getElementById('meta').textContent = `${videoData.length_min} min • ${videoData.views} views`;
+        document.getElementById('player').src = videoData.embed;
+      } catch (e) {
+        document.getElementById('title').textContent = "Failed to load video";
+        document.getElementById('meta').textContent = "API request failed. Please go back and retry.";
+        document.getElementById('btnSave').disabled = true;
+      }
     }
 
     document.getElementById('btnSave').onclick = async () => {
@@ -53,7 +76,7 @@
       });
       const tx = db.transaction("downloads", "readwrite");
       tx.objectStore("downloads").put({
-        id: id, title: videoData.title, thumb: api(videoData.default_thumb.src), createdAt: Date.now()
+        id: id, title: videoData.title, thumb: videoData.default_thumb.src, createdAt: Date.now()
       });
       alert("Added to Library");
     };
