@@ -55,7 +55,7 @@ async function doSearch() {
       {k:"Trex", u: `https://www.porntrex.com/rss/search/${query}/`}
     ];
 
-    feeds.forEach(async s => {
+    await Promise.all(feeds.map(async s => {
       try {
         const res = await fetch(api(s.u));
         const txt = await res.text();
@@ -66,9 +66,8 @@ async function doSearch() {
           src: s.k, tags: ""
         }));
         state.items = [...state.items, ...rssItems.filter(i => i.thumb)];
-        render(state.items);
       } catch(e){}
-    });
+    }));
     render(state.items);
   } catch(e){}
 }
