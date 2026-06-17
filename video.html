@@ -137,7 +137,12 @@ async function fetchWithProxy(url) {
 
 // Direct eporner API calls (handles via CORS proxy)
 const EPORNER_API = 'https://www.eporner.com/api/v2';
-const API_PROXY_URL = 'https://videoproxy.moananayoob.workers.dev';
+
+// Proxy options - try in order
+const PROXY_URLS = [
+  'https://videoproxy.moananayoob.workers.dev', // Your deployed worker
+  'https://cors-anywhere.herokuapp.com',         // Public CORS proxy
+];
 
 async function epornerAPI(endpoint, params = {}) {
   const url = new URL(`${EPORNER_API}${endpoint}`);
@@ -148,18 +153,34 @@ async function epornerAPI(endpoint, params = {}) {
     }
   });
 
-  try {
-    const proxyUrl = `${API_PROXY_URL}?url=${encodeURIComponent(url.toString())}`;
-    console.log('Fetching:', proxyUrl);
-    const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    console.log('API Response:', data);
-    return data;
-  } catch (e) {
-    console.error('API Error:', e);
-    throw e;
+  let lastError = null;
+
+  for (const proxyUrl of PROXY_URLS) {
+    try {
+      const proxiedUrl = `${proxyUrl}?url=${encodeURIComponent(url.toString())}`;
+      console.log('Fetching from:', proxyUrl);
+      const res = await fetch(proxiedUrl, {
+        signal: AbortSignal.timeout(10000),
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      });
+
+      if (!res.ok) {
+        lastError = new Error(`HTTP ${res.status} from ${proxyUrl}`);
+        continue;
+      }
+
+      const data = await res.json();
+      console.log('API Response:', data);
+      return data;
+    } catch (e) {
+      console.warn(`Proxy failed (${proxyUrl}):`, e.message);
+      lastError = e;
+    }
   }
+
+  throw lastError || new Error('All proxies failed');
 }
 
 let videoData = null;
