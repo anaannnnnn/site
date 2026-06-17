@@ -123,19 +123,48 @@
 </footer>
 
 <script>
-// Specialized proxies that support media streaming and Range headers
-const PROXIES = [
+// CORS Proxy for streaming media
+const STREAM_PROXIES = [
   (url) => `https://videoproxy.moananayoob.workers.dev?url=${encodeURIComponent(url)}`,
   (url) => `https://universal.moananayoob.workers.dev?url=${encodeURIComponent(url)}`
 ];
 
 async function fetchWithProxy(url) {
   let lastError = new Error("All proxies failed");
-  for (let i = 0; i < PROXIES.length; i++) {
+  for (let i = 0; i < STREAM_PROXIES.length; i++) {
     try {
-      const res = await fetch(PROXIES[i](url), { signal: AbortSignal.timeout(8000) });
+      const res = await fetch(STREAM_PROXIES[i](url), { signal: AbortSignal.timeout(8000) });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res;
+    } catch (e) {
+      lastError = e;
+    }
+  }
+  throw lastError;
+}
+
+// Direct eporner API calls (handles via CORS proxy if needed)
+const EPORNER_API = 'https://www.eporner.com/api/v2';
+const API_PROXIES = [
+  (url) => `https://videoproxy.moananayoob.workers.dev?url=${encodeURIComponent(url)}`,
+  (url) => `https://universal.moananayoob.workers.dev?url=${encodeURIComponent(url)}`
+];
+
+async function epornerAPI(endpoint, params = {}) {
+  const url = new URL(`${EPORNER_API}${endpoint}`);
+  url.searchParams.set('format', 'json');
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) {
+      url.searchParams.set(key, value);
+    }
+  });
+
+  let lastError = new Error("API call failed");
+  for (let i = 0; i < API_PROXIES.length; i++) {
+    try {
+      const res = await fetch(API_PROXIES[i](url.toString()), { signal: AbortSignal.timeout(8000) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
     } catch (e) {
       lastError = e;
     }
@@ -171,8 +200,10 @@ async function doSearch() {
   state.items = [];
 
   try {
-    const epRes = await fetchWithProxy(`https://www.eporner.com/api/v2/video/search/?query=${encodeURIComponent(state.keyword)}&per_page=30&format=json`);
-    const epData = await epRes.json();
+    const epData = await epornerAPI('/video/search/', {
+      query: state.keyword,
+      per_page: 30
+    });
     state.items = (epData.videos || []).map(v => ({
       id: v.id,
       url: v.url || '',
@@ -183,34 +214,11 @@ async function doSearch() {
       tags: v.keywords || ""
     }));
     render(state.items);
-    setStatus(`${state.items.length} results — loading more sources…`);
+    setStatus(`${state.items.length} results`);
   } catch(e) {
-    setStatus('Primary source failed — trying RSS feeds…');
+    console.error('Search failed:', e);
+    setStatus('Search failed. Please try again.');
   }
-
-  const feeds = [
-    { k: "HQ", u: `https://www.hqporner.com/rss/search/${encodeURIComponent(state.keyword)}/` },
-    { k: "Trex", u: `https://www.porntrex.com/rss/search/${encodeURIComponent(state.keyword)}/` }
-  ];
-
-  const rssResults = await Promise.allSettled(feeds.map(async s => {
-    const res = await fetchWithProxy(s.u);
-    const txt = await res.text();
-    const doc = new DOMParser().parseFromString(txt, "text/xml");
-    return [...doc.querySelectorAll("item")].map(it => ({
-      id: "",
-      url: it.querySelector("link")?.textContent,
-      title: it.querySelector("title")?.textContent,
-      thumb: it.getElementsByTagName("media:thumbnail")[0]?.getAttribute("url") || it.querySelector("enclosure")?.getAttribute("url"),
-      duration: '',
-      src: s.k,
-      tags: ""
-    })).filter(i => i.thumb && i.title);
-  }));
-
-  rssResults.forEach(r => {
-    if (r.status === 'fulfilled') state.items = [...state.items, ...r.value];
-  });
 
   if (state.items.length === 0) {
     document.getElementById('grid').innerHTML = `

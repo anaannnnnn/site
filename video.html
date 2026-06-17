@@ -115,18 +115,48 @@ const urlParams = new URLSearchParams(location.search);
 const id = urlParams.get("id");
 const directUrl = urlParams.get("url");
 
-const PROXIES = [
+// CORS Proxy for streaming media
+const STREAM_PROXIES = [
   (url) => `https://videoproxy.moananayoob.workers.dev?url=${encodeURIComponent(url)}`,
   (url) => `https://universal.moananayoob.workers.dev?url=${encodeURIComponent(url)}`
 ];
 
 async function fetchWithProxy(url) {
   let lastError = new Error("All proxies failed");
-  for (let i = 0; i < PROXIES.length; i++) {
+  for (let i = 0; i < STREAM_PROXIES.length; i++) {
     try {
-      const res = await fetch(PROXIES[i](url), { signal: AbortSignal.timeout(8000) });
+      const res = await fetch(STREAM_PROXIES[i](url), { signal: AbortSignal.timeout(8000) });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res;
+    } catch (e) {
+      lastError = e;
+    }
+  }
+  throw lastError;
+}
+
+// Direct eporner API calls
+const EPORNER_API = 'https://www.eporner.com/api/v2';
+const API_PROXIES = [
+  (url) => `https://videoproxy.moananayoob.workers.dev?url=${encodeURIComponent(url)}`,
+  (url) => `https://universal.moananayoob.workers.dev?url=${encodeURIComponent(url)}`
+];
+
+async function epornerAPI(endpoint, params = {}) {
+  const url = new URL(`${EPORNER_API}${endpoint}`);
+  url.searchParams.set('format', 'json');
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) {
+      url.searchParams.set(key, value);
+    }
+  });
+
+  let lastError = new Error("API call failed");
+  for (let i = 0; i < API_PROXIES.length; i++) {
+    try {
+      const res = await fetch(API_PROXIES[i](url.toString()), { signal: AbortSignal.timeout(8000) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
     } catch (e) {
       lastError = e;
     }
@@ -172,7 +202,7 @@ async function load() {
       length_min: ""
     };
     
-    document.getElementById('player').src = PROXIES[0](directUrl);
+    document.getElementById('player').src = STREAM_PROXIES[0](directUrl);
     document.getElementById('title').textContent = videoData.title;
     document.getElementById('meta').textContent = "Direct Stream Link";
     document.getElementById('titleSkeleton').classList.add('hidden');
@@ -184,12 +214,11 @@ async function load() {
 
   // Handle standard JSON payload processing
   try {
-    const res = await fetchWithProxy(`https://www.eporner.com/api/v2/video/id/?id=${id}&format=json&thumbsize=big`);
-    videoData = await res.json();
+    videoData = await epornerAPI('/video/id/', { id, thumbsize: 'big' });
 
     // Route direct asset formats into the proxy architecture safely
     const rawAssetUrl = videoData.embed || videoData.url;
-    document.getElementById('player').src = PROXIES[0](rawAssetUrl);
+    document.getElementById('player').src = STREAM_PROXIES[0](rawAssetUrl);
     
     document.getElementById('title').textContent = videoData.title;
     document.getElementById('meta').textContent = [
@@ -215,8 +244,7 @@ async function load() {
 async function loadRelated(keywords) {
   const query = (keywords || "trending").split(",")[0].trim();
   try {
-    const res = await fetchWithProxy(`https://www.eporner.com/api/v2/video/search/?query=${encodeURIComponent(query)}&per_page=8&format=json`);
-    const data = await res.json();
+    const data = await epornerAPI('/video/search/', { query, per_page: 8 });
     const videos = (data.videos || []).filter(v => v.id !== id).slice(0, 6);
     document.getElementById('related').innerHTML = videos.map(v => `
       <div class="related-card rounded-xl overflow-hidden flex gap-3 p-2" onclick="location.href='video.html?id=${v.id}'">
