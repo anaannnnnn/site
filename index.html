@@ -198,10 +198,18 @@ async function doSearch() {
   state.items = [];
 
   try {
+    console.log('Searching for:', state.keyword);
     const epData = await epornerAPI('/video/search/', {
       query: state.keyword,
       per_page: 30
     });
+
+    console.log('Search results:', epData);
+
+    if (!epData || !epData.videos) {
+      throw new Error('Invalid API response: ' + JSON.stringify(epData));
+    }
+
     state.items = (epData.videos || []).map(v => ({
       id: v.id,
       url: v.url || '',
@@ -211,25 +219,24 @@ async function doSearch() {
       src: "EP",
       tags: v.keywords || ""
     }));
-    render(state.items);
-    setStatus(`${state.items.length} results`);
-  } catch(e) {
-    console.error('Search failed:', e);
-    setStatus('Search failed. Please try again.');
-  }
 
-  if (state.items.length === 0) {
+    console.log('Mapped items:', state.items);
+
+    if (state.items.length === 0) {
+      throw new Error('No videos found in response');
+    }
+
+    render(state.items);
+    setStatus(`${state.items.length} results found`);
+  } catch(e) {
+    console.error('Search failed:', e.message, e);
     document.getElementById('grid').innerHTML = `
       <div class="col-span-full flex flex-col items-center py-24 gap-4">
         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <p class="text-slate-500 text-sm">No results found. Try a different search.</p>
+        <p class="text-slate-500 text-sm">Search failed: ${e.message}</p>
       </div>`;
-    setStatus('');
-    return;
+    setStatus('Error: ' + e.message);
   }
-
-  render(state.items);
-  setStatus(`${state.items.length} videos found`);
 }
 
 function render(items) {

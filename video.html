@@ -212,12 +212,22 @@ async function load() {
 
   // Handle standard JSON payload processing
   try {
+    console.log('Loading video:', id);
     videoData = await epornerAPI('/video/id/', { id, thumbsize: 'big' });
+    console.log('Video data:', videoData);
+
+    if (!videoData || !videoData.title) {
+      throw new Error('Invalid video data: ' + JSON.stringify(videoData));
+    }
 
     // Route direct asset formats into the proxy architecture safely
     const rawAssetUrl = videoData.embed || videoData.url;
+    if (!rawAssetUrl) {
+      throw new Error('No video URL found in response');
+    }
+
     document.getElementById('player').src = STREAM_PROXIES[0](rawAssetUrl);
-    
+
     document.getElementById('title').textContent = videoData.title;
     document.getElementById('meta').textContent = [
       videoData.length_min ? `${videoData.length_min} min` : '',
@@ -231,10 +241,11 @@ async function load() {
 
     loadRelated(videoData.keywords);
   } catch (e) {
+    console.error('Failed to load video:', e.message, e);
     document.getElementById('titleSkeleton').classList.add('hidden');
     document.getElementById('titleBlock').classList.remove('hidden');
     document.getElementById('title').textContent = "Failed to load video";
-    document.getElementById('meta').textContent = "API query failed. Check worker logs.";
+    document.getElementById('meta').textContent = "Error: " + e.message;
     document.getElementById('related').innerHTML = '';
   }
 }
