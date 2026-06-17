@@ -16,13 +16,21 @@ const CORS_HEADERS = {
 
 // Headers that help bypass regional restrictions
 const BYPASS_HEADERS = {
-  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-  'Accept': '*/*',
-  'Accept-Language': 'en-US,en;q=0.9',
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0',
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+  'Accept-Language': 'en-US,en;q=0.9,es;q=0.8',
   'Accept-Encoding': 'gzip, deflate, br',
+  'Cache-Control': 'max-age=0',
   'DNT': '1',
   'Connection': 'keep-alive',
   'Upgrade-Insecure-Requests': '1',
+  'Sec-Fetch-Dest': 'document',
+  'Sec-Fetch-Mode': 'navigate',
+  'Sec-Fetch-Site': 'none',
+  'Sec-Fetch-User': '?1',
+  'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120"',
+  'Sec-Ch-Ua-Mobile': '?0',
+  'Sec-Ch-Ua-Platform': '"Windows"',
 };
 
 export default {
@@ -68,6 +76,9 @@ export default {
       const fetchHeaders = {
         ...BYPASS_HEADERS,
         'Referer': targetURL.origin + '/',
+        'X-Forwarded-For': '8.8.8.8', // Use public IP to help bypass geo-blocks
+        'X-Forwarded-Proto': 'https',
+        'X-Real-IP': '8.8.8.8',
       };
 
       upstreamResponse = await fetch(targetURL.toString(), {
@@ -75,8 +86,17 @@ export default {
         headers: fetchHeaders,
         redirect: 'follow',
         cf: {
-          cacheTtl: 60, // Cache for 60 seconds
+          cacheTtl: 60,
           cacheEverything: true,
+          mirage: true,
+          polish: 'lossy',
+          minify: {
+            javascript: false,
+            css: false,
+            html: false,
+          },
+          // Bypass geo-blocking by using Cloudflare's edge location
+          country: 'US', // Spoof as US traffic
         },
       });
     } catch (err) {
