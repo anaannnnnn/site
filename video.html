@@ -135,12 +135,9 @@ async function fetchWithProxy(url) {
   throw lastError;
 }
 
-// Direct eporner API calls
+// Direct eporner API calls (handles via CORS proxy)
 const EPORNER_API = 'https://www.eporner.com/api/v2';
-const API_PROXIES = [
-  (url) => `https://videoproxy.moananayoob.workers.dev?url=${encodeURIComponent(url)}`,
-  (url) => `https://universal.moananayoob.workers.dev?url=${encodeURIComponent(url)}`
-];
+const API_PROXY_URL = 'https://videoproxy.moananayoob.workers.dev';
 
 async function epornerAPI(endpoint, params = {}) {
   const url = new URL(`${EPORNER_API}${endpoint}`);
@@ -151,17 +148,18 @@ async function epornerAPI(endpoint, params = {}) {
     }
   });
 
-  let lastError = new Error("API call failed");
-  for (let i = 0; i < API_PROXIES.length; i++) {
-    try {
-      const res = await fetch(API_PROXIES[i](url.toString()), { signal: AbortSignal.timeout(8000) });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return await res.json();
-    } catch (e) {
-      lastError = e;
-    }
+  try {
+    const proxyUrl = `${API_PROXY_URL}?url=${encodeURIComponent(url.toString())}`;
+    console.log('Fetching:', proxyUrl);
+    const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    console.log('API Response:', data);
+    return data;
+  } catch (e) {
+    console.error('API Error:', e);
+    throw e;
   }
-  throw lastError;
 }
 
 let videoData = null;
